@@ -14,6 +14,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
 
 -- The Shelley ledger uses promoted data kinds which we have to use, but we do
@@ -638,6 +639,29 @@ deriving instance Eq (Address Shelley)
 deriving instance Ord (Address Shelley)
 deriving instance Show (Address Shelley)
 
+instance SerialiseAddress (Address era) => ToJSON (Address era) where
+  toJSON = Aeson.String . serialiseAddress
+
+instance FromJSON (Address Byron) where
+  parseJSON = Aeson.withText "Address" parseAddress
+    where
+      parseAddress :: Text -> Aeson.Parser (Address Byron)
+      parseAddress txt =
+        maybe
+          (fail "Invalid Byron address.")
+          pure
+          (deserialiseAddress AsByronAddress txt)
+
+instance FromJSON (Address Shelley) where
+  parseJSON = Aeson.withText "Address" parseAddress
+    where
+      parseAddress :: Text -> Aeson.Parser (Address Shelley)
+      parseAddress txt =
+        maybe
+          (fail "Invalid Shelley address.")
+          pure
+          (deserialiseAddress AsShelleyAddress txt)
+
 data StakeAddress where
 
      StakeAddress
@@ -874,7 +898,7 @@ toShelleyStakeReference  NoStakeAddress =
 
 newtype TxId = TxId (Shelley.Hash StandardShelley ())
   deriving stock (Eq, Ord, Show)
-  deriving newtype (IsString)
+  deriving newtype (IsString, ToJSON, FromJSON)
                -- We use the Shelley representation and convert the Byron one
 
 instance HasTypeProxy TxId where
@@ -920,9 +944,23 @@ data TxIn = TxIn TxId TxIx
 deriving instance Eq TxIn
 deriving instance Show TxIn
 
+instance ToJSON TxIn where
+  toJSON (TxIn txId txIx) =
+    Aeson.object
+      [ "txId" .= toJSON txId
+      , "txIx" .= toJSON txIx
+      ]
+
+instance FromJSON TxIn where
+  parseJSON =
+    Aeson.withObject "TxIn" $ \v ->
+      TxIn
+        <$> v .: "txId"
+        <*> v .: "txIx"
+
 newtype TxIx = TxIx Word
   deriving stock (Eq, Ord, Show)
-  deriving newtype (Enum)
+  deriving newtype (Enum, ToJSON, FromJSON)
 
 data TxOut era = TxOut (Address era) Lovelace
 
@@ -931,8 +969,23 @@ deriving instance Eq (TxOut Shelley)
 deriving instance Show (TxOut Byron)
 deriving instance Show (TxOut Shelley)
 
+instance SerialiseAddress (Address era) => ToJSON (TxOut era) where
+  toJSON (TxOut addr amount) =
+    Aeson.object
+      [ "address" .= toJSON addr
+      , "amount" .= toJSON amount
+      ]
+
+instance FromJSON (Address era) => FromJSON (TxOut era) where
+  parseJSON =
+    Aeson.withObject "TxOut" $ \v ->
+      TxOut
+        <$> v .: "address"
+        <*> v .: "amount"
+
 newtype Lovelace = Lovelace Integer
   deriving (Eq, Ord, Enum, Show)
+  deriving newtype (ToJSON, FromJSON)
 
 
 toByronTxIn  :: TxIn -> Byron.TxIn
