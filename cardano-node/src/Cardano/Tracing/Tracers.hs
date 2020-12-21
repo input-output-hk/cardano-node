@@ -30,8 +30,10 @@ import           GHC.Clock (getMonotonicTimeNSec)
 
 import           Codec.CBOR.Read (DeserialiseFailure)
 import           Data.Aeson (ToJSON (..), Value (..))
+import qualified Data.ByteString.Base16 as B16
 import qualified Data.HashMap.Strict as Map
 import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
 import           Data.Time (UTCTime)
 
 import           Network.Mux (MuxTrace, WithMuxBearer)
@@ -49,8 +51,9 @@ import           Cardano.BM.Internal.ElidingTracer
 import           Cardano.BM.Trace (traceNamedObject)
 import           Cardano.BM.Tracing
 
-import           Ouroboros.Consensus.Block (BlockProtocol, CannotForge, ConvertRawHash,
-                     ForgeStateInfo, ForgeStateUpdateError, Header, realPointSlot)
+import           Ouroboros.Consensus.Block (BlockProtocol, CannotForge, ConvertRawHash (..),
+                     ForgeStateInfo, ForgeStateUpdateError, Header, HeaderHash, realPointHash,
+                     realPointSlot)
 import           Ouroboros.Consensus.BlockchainTime (SystemStart (..),
                      TraceBlockchainTimeEvent (..))
 import           Ouroboros.Consensus.HeaderValidation (OtherHeaderEnvelopeError)
@@ -68,8 +71,8 @@ import qualified Ouroboros.Consensus.Node.Tracers as Consensus
 import           Ouroboros.Consensus.Protocol.Abstract (ValidationErr)
 
 import qualified Ouroboros.Network.AnchoredFragment as AF
-import           Ouroboros.Network.Block (BlockNo (..), HasHeader (..), Point, StandardHash,
-                     blockNo, pointSlot, unBlockNo)
+import           Ouroboros.Network.Block (BlockNo (..), ChainHash (..), HasHeader (..), Point,
+                     StandardHash, blockNo, pointSlot, unBlockNo)
 import           Ouroboros.Network.BlockFetch.ClientState (TraceLabelPeer (..))
 import           Ouroboros.Network.BlockFetch.Decision (FetchDecision, FetchDecline (..))
 import qualified Ouroboros.Network.NodeToClient as NtC
@@ -84,10 +87,12 @@ import qualified Ouroboros.Consensus.Storage.LedgerDB.OnDisk as LedgerDB
 import           Cardano.Tracing.Config
 import           Cardano.Tracing.Constraints (TraceConstraints)
 import           Cardano.Tracing.ConvertTxId (ConvertTxId)
+import           Cardano.Tracing.HasIssuer (BlockIssuerVerificationKeyHash (..), HasIssuer (..))
 import           Cardano.Tracing.Kernel
 import           Cardano.Tracing.Metrics
 import           Cardano.Tracing.MicroBenchmarking
 import           Cardano.Tracing.Queries
+import           Cardano.Tracing.Render (renderChainHash, renderHeaderHash)
 
 import           Cardano.Node.Configuration.Logging
 -- For tracing instances
@@ -261,7 +266,6 @@ instance (StandardHash header, Eq peer) => ElidingTracer
 mkTracers
   :: forall peer localPeer blk.
      ( Consensus.RunNode blk
-     , HasKESMetricsData blk
      , TraceConstraints blk
      , Show peer, Eq peer
      , Show localPeer
@@ -345,6 +349,7 @@ mkTracers TracingOff _ _ =
 
 teeTraceChainTip
   :: ( ConvertRawHash blk
+     , HasIssuer blk
      , LedgerSupportsProtocol blk
      , InspectLedger blk
      , ToObject (Header blk)
@@ -373,33 +378,73 @@ teeTraceChainTipElide
   -> Tracer IO (WithSeverity (ChainDB.TraceEvent blk))
 teeTraceChainTipElide = elideToLogObject
 
-traceChainInformation :: Trace IO Text -> ChainInformation -> IO ()
-traceChainInformation tr ChainInformation { slots, blocks, density, epoch, slotInEpoch } = do
-  -- TODO this is executed each time the chain changes. How cheap is it?
-  meta <- mkLOMeta Critical Confidential
-  let tr' = appendName "metrics" tr
-      traceD :: Text -> Double -> IO ()
-      traceD msg d = traceNamedObject tr' (meta, LogValue msg (PureD d))
-      traceI :: Integral a => Text -> a -> IO ()
-      traceI msg i = traceNamedObject tr' (meta, LogValue msg (PureI (fromIntegral i)))
+traceChainInformation
+  :: forall blk. ConvertRawHash blk
+  => Trace IO Text
+  -> ChainInformation blk
+  -> IO ()
+traceChainInformation tr chainInfo = do
+    -- TODO this is executed each time the chain tip changes. How cheap is it?
+    meta <- mkLOMeta Critical Confidential
+    let tr' = appendName "metrics" tr
+        traceD :: Text -> Double -> IO ()
+        traceD msg d = traceNamedObject tr' (meta, LogValue msg (PureD d))
+        traceI :: Integral a => Text -> a -> IO ()
+        traceI msg i = traceNamedObject tr' (meta, LogValue msg (PureI (fromIntegral i)))
 
-  traceD "density"     (fromRational density)
-  traceI "slotNum"     slots
-  traceI "blockNum"    blocks
-  traceI "slotInEpoch" slotInEpoch
-  traceI "epoch"       (unEpochNo epoch)
+    traceD "density"     (fromRational density)
+    traceI "slotNum"     slots
+    traceI "blockNum"    blocks
+    traceI "slotInEpoch" slotInEpoch
+    traceI "epoch"       (unEpochNo epoch)
+    traceNamedObject
+      (appendName "tipBlockHash" tr')
+      (meta, LogMessage tipBlockHashText)
+    traceNamedObject
+      (appendName "tipBlockParentHash" tr')
+      (meta, LogMessage tipBlockParentHashText)
+    traceNamedObject
+      (appendName "tipBlockIssuerVerificationKeyHash" tr')
+      (meta, LogMessage tipBlockIssuerVkHashText)
+  where
+    ChainInformation
+      { slots
+      , blocks
+      , density
+      , epoch
+      , slotInEpoch
+      , tipBlockHash
+      , tipBlockParentHash
+      , tipBlockIssuerVerificationKeyHash
+      } = chainInfo
+
+    tipBlockHashText :: Text
+    tipBlockHashText = renderHeaderHash (Proxy @blk) tipBlockHash
+
+    tipBlockParentHashText :: Text
+    tipBlockParentHashText =
+      renderChainHash
+        (Text.decodeLatin1 . B16.encode . toRawHash (Proxy @blk))
+        tipBlockParentHash
+
+    tipBlockIssuerVkHashText :: Text
+    tipBlockIssuerVkHashText =
+      case tipBlockIssuerVerificationKeyHash of
+        NoBlockIssuer -> "NoBlockIssuer"
+        BlockIssuerVerificationKeyHash bs ->
+          Text.decodeLatin1 (B16.encode bs)
 
 teeTraceChainTip'
-  :: HasHeader (Header blk)
+  :: (HasHeader (Header blk), HasIssuer blk, ConvertRawHash blk)
   => Trace IO Text -> Tracer IO (WithSeverity (ChainDB.TraceEvent blk))
 teeTraceChainTip' tr =
     Tracer $ \(WithSeverity _ ev') ->
       case ev' of
           (ChainDB.TraceAddBlockEvent ev) -> case ev of
-            ChainDB.SwitchedToAFork _warnings newTipInfo _ newChain ->
-              traceChainInformation tr (chainInformation newTipInfo newChain)
-            ChainDB.AddedToCurrentChain _warnings newTipInfo _ newChain ->
-              traceChainInformation tr (chainInformation newTipInfo newChain)
+            ChainDB.SwitchedToAFork _warnings newTipInfo oldChain newChain ->
+              traceChainInformation tr (chainInformation newTipInfo oldChain newChain)
+            ChainDB.AddedToCurrentChain _warnings newTipInfo oldChain newChain ->
+              traceChainInformation tr (chainInformation newTipInfo oldChain newChain)
             _ -> pure ()
           _ -> pure ()
 
@@ -879,7 +924,7 @@ teeTraceBlockFetchDecision'
     -> Tracer IO (WithSeverity [TraceLabelPeer peer (FetchDecision [Point (Header blk)])])
 teeTraceBlockFetchDecision' tr =
     Tracer $ \(WithSeverity _ peers) -> do
-      meta <- mkLOMeta Info Confidential
+      meta <- mkLOMeta Critical Confidential
       let tr' = appendName "peers" tr
       traceNamedObject tr' (meta, LogValue "connectedPeers" . PureI $ fromIntegral $ length peers)
 
@@ -897,7 +942,7 @@ teeTraceBlockFetchDecisionElide = elideToLogObject
 
 -- | get information about a chain fragment
 
-data ChainInformation = ChainInformation
+data ChainInformation blk = ChainInformation
   { slots :: Word64
   , blocks :: Word64
   , density :: Rational
@@ -908,20 +953,39 @@ data ChainInformation = ChainInformation
   , slotInEpoch :: Word64
     -- ^ Relative slot number of the tip of the current chain within the
     -- epoch.
+  , tipBlockHash :: HeaderHash blk
+    -- ^ Hash of the last adopted block.
+  , tipBlockParentHash :: ChainHash (Header blk)
+    -- ^ Hash of the parent block of the last adopted block.
+  , tipBlockIssuerVerificationKeyHash :: BlockIssuerVerificationKeyHash
+    -- ^ Hash of the last adopted block issuer's verification key.
   }
 
 chainInformation
-  :: forall blk. HasHeader (Header blk)
+  :: forall blk. (HasHeader (Header blk), HasIssuer blk)
   => ChainDB.NewTipInfo blk
-  -> AF.AnchoredFragment (Header blk)
-  -> ChainInformation
-chainInformation newTipInfo frag = ChainInformation
+  -> AF.AnchoredFragment (Header blk) -- ^ Old fragment.
+  -> AF.AnchoredFragment (Header blk) -- ^ New fragment.
+  -> ChainInformation blk
+chainInformation newTipInfo oldFrag frag = ChainInformation
     { slots       = unSlotNo $ fromWithOrigin 0 (AF.headSlot frag)
     , blocks      = unBlockNo $ fromWithOrigin (BlockNo 1) (AF.headBlockNo frag)
     , density     = fragmentChainDensity frag
     , epoch       = ChainDB.newTipEpoch newTipInfo
     , slotInEpoch = ChainDB.newTipSlotInEpoch newTipInfo
+    , tipBlockHash = realPointHash (ChainDB.newTipPoint newTipInfo)
+    , tipBlockParentHash = AF.headHash oldFrag
+    , tipBlockIssuerVerificationKeyHash = tipIssuerVkHash
     }
+  where
+    tipIssuerVkHash :: BlockIssuerVerificationKeyHash
+    tipIssuerVkHash =
+      case AF.head frag of
+        Left AF.AnchorGenesis ->
+          NoBlockIssuer
+        Left (AF.Anchor _s _h _b) ->
+          NoBlockIssuer
+        Right blk -> getIssuerVerificationKeyHash blk
 
 fragmentChainDensity ::
   HasHeader (Header blk)
