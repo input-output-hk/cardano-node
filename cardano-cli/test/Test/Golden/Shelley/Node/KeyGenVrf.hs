@@ -24,8 +24,5 @@ golden_shelleyNodeKeyGenVrf = propertyOnce . H.moduleWorkspace "tmp" $ \tempDir 
     , "--signing-key-file", signingKey
     ]
 
-  H.assertFileOccurences 1 "VRF Verification Key" verificationKey
-  H.assertFileOccurences 1 "VRF Signing Key" signingKey
-
-  H.assertEndsWithSingleNewline verificationKey
-  H.assertEndsWithSingleNewline signingKey
+  H.assertFileOccurences 1 "vrf_vk" verificationKey
+  H.assertFileOccurences 1 "vrf_sk" signingKey

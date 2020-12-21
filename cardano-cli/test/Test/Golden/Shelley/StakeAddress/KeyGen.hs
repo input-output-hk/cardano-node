@@ -24,8 +24,5 @@ golden_shelleyStakeAddressKeyGen = propertyOnce . H.moduleWorkspace "tmp" $ \tem
     , "--signing-key-file", signingKeyFile
     ]
 
-  H.assertFileOccurences 1 "StakeVerificationKeyShelley_ed25519" verificationKeyFile
-  H.assertFileOccurences 1 "StakeSigningKeyShelley_ed25519" signingKeyFile
-
-  H.assertEndsWithSingleNewline verificationKeyFile
-  H.assertEndsWithSingleNewline signingKeyFile
+  H.assertFileOccurences 1 "stake_vk" verificationKeyFile
+  H.assertFileOccurences 1 "stake_sk" signingKeyFile

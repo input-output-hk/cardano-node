@@ -17,6 +17,8 @@ import           Cardano.Prelude hiding (All, Any, option)
 import           Prelude (String)
 
 import           Cardano.Api
+import           Cardano.Api.DeserialiseAnyOf (InputFormat (..), deserialiseInput,
+                     renderInputDecodeError)
 import           Cardano.Api.Protocol (Protocol (..))
 import           Cardano.Api.Shelley
 
@@ -24,9 +26,8 @@ import           Cardano.Chain.Slotting (EpochSlots (..))
 import           Cardano.CLI.Mary.TxOutParser (parseTxOutAnyEra)
 import           Cardano.CLI.Mary.ValueParser (parseValue)
 import           Cardano.CLI.Shelley.Commands
-import           Cardano.CLI.Shelley.Key (InputFormat (..), VerificationKeyOrFile (..),
-                     VerificationKeyOrHashOrFile (..), VerificationKeyTextOrFile (..),
-                     deserialiseInput, renderInputDecodeError)
+import           Cardano.CLI.Shelley.Key (VerificationKeyOrFile (..),
+                     VerificationKeyOrHashOrFile (..), VerificationKeyTextOrFile (..))
 import           Cardano.CLI.Types
 import           Control.Monad.Fail (fail)
 import           Data.Attoparsec.Combinator ((<?>))
@@ -40,7 +41,6 @@ import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BSC
 import qualified Data.Char as Char
 import qualified Data.IP as IP
-import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
@@ -582,11 +582,15 @@ pNodeCmd =
 
     pKeyGenKES :: Parser NodeCmd
     pKeyGenKES =
-      NodeKeyGenKES <$> pVerificationKeyFile Output <*> pSigningKeyFile Output
+      NodeKeyGenKES
+        <$> pVerificationKeyFile Output
+        <*> pSigningKeyFile Output
 
     pKeyGenVRF :: Parser NodeCmd
     pKeyGenVRF =
-      NodeKeyGenVRF <$> pVerificationKeyFile Output <*> pSigningKeyFile Output
+      NodeKeyGenVRF
+        <$> pVerificationKeyFile Output
+        <*> pSigningKeyFile Output
 
     pKeyHashVRF :: Parser NodeCmd
     pKeyHashVRF =
@@ -630,7 +634,10 @@ pPoolCmd =
       ]
   where
     pId :: Parser PoolCmd
-    pId = PoolGetId <$> pStakePoolVerificationKeyOrFile <*> pOutputFormat
+    pId =
+      PoolGetId
+        <$> pStakePoolVerificationKeyOrFile
+        <*> pMaybeOutputFile
 
     pPoolMetaDataHashSubCmd :: Parser PoolCmd
     pPoolMetaDataHashSubCmd = PoolMetaDataHash <$> pPoolMetaDataFile <*> pMaybeOutputFile
@@ -725,7 +732,7 @@ pGovernanceCmd =
     pMIRCertificate :: Parser GovernanceCmd
     pMIRCertificate = GovernanceMIRCertificate
                         <$> pMIRPot
-                        <*> some pStakeVerificationKeyFile
+                        <*> some pStakeVerificationKeyOrFile
                         <*> some pRewardAmt
                         <*> pOutputFile
 
@@ -1221,17 +1228,6 @@ pOperatorCertIssueCounterFile =
         (  Opt.long "operational-certificate-issue-counter"
         <> Opt.internal
         )
-    )
-
-
-pOutputFormat :: Parser OutputFormat
-pOutputFormat =
-  Opt.option readOutputFormat
-    (  Opt.long "output-format"
-    <> Opt.metavar "STRING"
-    <> Opt.help "Optional output format. Accepted output formats are \"hex\" \
-                \and \"bech32\" (default is \"bech32\")."
-    <> Opt.value OutputFormatBech32
     )
 
 
@@ -2390,8 +2386,8 @@ readVerificationKey
 readVerificationKey asType =
     Opt.eitherReader deserialiseFromBech32OrHex
   where
-    keyFormats :: NonEmpty (InputFormat (VerificationKey keyrole))
-    keyFormats = NE.fromList [InputFormatBech32, InputFormatHex]
+    keyFormats :: [InputFormat (VerificationKey keyrole)]
+    keyFormats = [InputFormatBech32, InputFormatHex]
 
     deserialiseFromBech32OrHex
       :: String
@@ -2399,17 +2395,6 @@ readVerificationKey asType =
     deserialiseFromBech32OrHex str =
       first (Text.unpack . renderInputDecodeError) $
         deserialiseInput (AsVerificationKey asType) keyFormats (BSC.pack str)
-
-readOutputFormat :: Opt.ReadM OutputFormat
-readOutputFormat = do
-  s <- Opt.str
-  case s of
-    "hex" -> pure OutputFormatHex
-    "bech32" -> pure OutputFormatBech32
-    _ ->
-      fail $ "Invalid output format: \""
-        <> s
-        <> "\". Accepted output formats are \"hex\" and \"bech32\"."
 
 readURIOfMaxLength :: Int -> Opt.ReadM Text
 readURIOfMaxLength maxLen =
@@ -2455,4 +2440,3 @@ readerFromParsecParser p =
 subParser :: String -> ParserInfo a -> Parser a
 subParser availableCommand pInfo =
   Opt.hsubparser $ Opt.command availableCommand pInfo <> Opt.metavar availableCommand
-

@@ -26,10 +26,8 @@ golden_shelleyNodeKeyGen = propertyOnce . H.moduleWorkspace "tmp" $ \tempDir -> 
     , "--operational-certificate-issue-counter", opCertCounterFile
     ]
 
-  H.assertFileOccurences 1 "StakePoolVerificationKey_ed25519" verificationKeyFile
-  H.assertFileOccurences 1 "StakePoolSigningKey_ed25519" signingKeyFile
+  H.assertFileOccurences 1 "pool_vk" verificationKeyFile
+  H.assertFileOccurences 1 "pool_sk" signingKeyFile
   H.assertFileOccurences 1 "NodeOperationalCertificateIssueCounter" opCertCounterFile
 
-  H.assertEndsWithSingleNewline verificationKeyFile
-  H.assertEndsWithSingleNewline signingKeyFile
   H.assertEndsWithSingleNewline opCertCounterFile

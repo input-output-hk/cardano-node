@@ -48,8 +48,9 @@ import           Shelley.Spec.Ledger.Keys (coerceKeyRole)
 import           Shelley.Spec.Ledger.PParams (ProtVer (..))
 
 import qualified Cardano.Api as Api (FileError (..))
+import           Cardano.Api.DeserialiseAnyOf (InputDecodeError (..), InputFormat (..),
+                     readFileAnyOfInputFormats, readFileTextEnvelope')
 import           Cardano.Api.Shelley hiding (FileError)
-
 
 import           Cardano.Node.Types
 
@@ -166,12 +167,11 @@ readLeaderCredentialsSingleton
        shelleyVRFFile       = Just vrfFile,
        shelleyKESFile       = Just kesFile
      } =
-     fmap (:[]) $
+     fmap (:[]) . firstExceptT FileError $
      mkPraosLeaderCredentials
-       <$> firstExceptT FileError (newExceptT $ readFileTextEnvelope AsOperationalCertificate certFile)
-       <*> firstExceptT FileError (newExceptT $ readFileTextEnvelope (AsSigningKey AsVrfKey) vrfFile)
-       <*> firstExceptT FileError (newExceptT $ readFileTextEnvelope (AsSigningKey AsKesKey) kesFile)
--- But not OK to supply some of the files without the others.
+       <$> newExceptT (readFileTextEnvelope' AsOperationalCertificate certFile)
+       <*> newExceptT (readFileAnyOfInputFormats (AsSigningKey AsVrfKey) [InputFormatBech32, InputFormatHex, InputFormatTextEnvelope] vrfFile)
+       <*> newExceptT (readFileAnyOfInputFormats (AsSigningKey AsKesKey) [InputFormatBech32, InputFormatHex, InputFormatTextEnvelope] kesFile)
 readLeaderCredentialsSingleton ProtocolFilepaths {shelleyCertFile = Nothing} =
      throwError OCertNotSpecified
 readLeaderCredentialsSingleton ProtocolFilepaths {shelleyVRFFile = Nothing} =
@@ -248,7 +248,7 @@ parseEnvelope ::
   -> (TextEnvelope, String)
   -> ExceptT ShelleyProtocolInstantiationError IO a
 parseEnvelope as (te, loc) =
-  firstExceptT (FileError . Api.FileError loc) . hoistEither $
+  firstExceptT (FileError . Api.FileError loc . InputTextEnvelopeError) . hoistEither $
     deserialiseFromTextEnvelope as te
 
 
@@ -263,7 +263,7 @@ data ShelleyProtocolInstantiationError =
      | GenesisValidationFailure ![ValidationErr]
      | CredentialsReadError !FilePath !IOException
      | EnvelopeParseError !FilePath !String
-     | FileError !(Api.FileError TextEnvelopeError)
+     | FileError !(Api.FileError InputDecodeError)
 --TODO: pick a less generic constructor than FileError
 
      | OCertNotSpecified

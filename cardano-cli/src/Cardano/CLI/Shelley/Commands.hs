@@ -258,7 +258,7 @@ data PoolCmd
       EpochNo
       -- ^ Epoch in which to retire the stake pool.
       OutputFile
-  | PoolGetId (VerificationKeyOrFile StakePoolKey) OutputFormat
+  | PoolGetId (VerificationKeyOrFile StakePoolKey) (Maybe OutputFile)
   | PoolMetaDataHash PoolMetaDataFile (Maybe OutputFile)
   deriving (Eq, Show)
 
@@ -292,7 +292,11 @@ renderQueryCmd cmd =
     QueryProtocolState {} -> "query protocol-state"
 
 data GovernanceCmd
-  = GovernanceMIRCertificate MIRPot [VerificationKeyFile] [Lovelace] OutputFile
+  = GovernanceMIRCertificate
+      MIRPot
+      [VerificationKeyOrFile StakeKey]
+      [Lovelace]
+      OutputFile
   | GovernanceGenesisKeyDelegationCertificate
       (VerificationKeyOrHashOrFile GenesisKey)
       (VerificationKeyOrHashOrFile GenesisDelegateKey)

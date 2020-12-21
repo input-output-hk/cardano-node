@@ -24,8 +24,5 @@ golden_shelleyNodeKeyGenKes = propertyOnce . H.moduleWorkspace "tmp" $ \tempDir 
     , "--signing-key-file", signingKey
     ]
 
-  H.assertFileOccurences 1 "KesVerificationKey_ed25519_kes_2^6" verificationKey
-  H.assertFileOccurences 1 "KesSigningKey_ed25519_kes_2^6" signingKey
-
-  H.assertEndsWithSingleNewline verificationKey
-  H.assertEndsWithSingleNewline signingKey
+  H.assertFileOccurences 1 "kes_vk" verificationKey
+  H.assertFileOccurences 1 "kes_sk" signingKey

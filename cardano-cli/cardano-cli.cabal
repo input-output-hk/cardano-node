@@ -278,14 +278,9 @@ test-suite cardano-cli-golden
                         Test.Golden.Shelley.TextEnvelope.Certificates.OperationalCertificate
                         Test.Golden.Shelley.TextEnvelope.Certificates.StakeAddressCertificates
                         Test.Golden.Shelley.TextEnvelope.Certificates.StakePoolCertificates
-                        Test.Golden.Shelley.TextEnvelope.Keys.ExtendedPaymentKeys
                         Test.Golden.Shelley.TextEnvelope.Keys.GenesisDelegateKeys
                         Test.Golden.Shelley.TextEnvelope.Keys.GenesisKeys
                         Test.Golden.Shelley.TextEnvelope.Keys.GenesisUTxOKeys
-                        Test.Golden.Shelley.TextEnvelope.Keys.KESKeys
-                        Test.Golden.Shelley.TextEnvelope.Keys.PaymentKeys
-                        Test.Golden.Shelley.TextEnvelope.Keys.StakeKeys
-                        Test.Golden.Shelley.TextEnvelope.Keys.VRFKeys
                         Test.Golden.Shelley.TextEnvelope.Tx.Tx
                         Test.Golden.Shelley.TextEnvelope.Tx.TxBody
                         Test.Golden.Shelley.TextEnvelope.Tx.Witness

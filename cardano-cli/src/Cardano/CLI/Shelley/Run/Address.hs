@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 
 module Cardano.CLI.Shelley.Run.Address
@@ -22,12 +23,13 @@ import           Control.Monad.Trans.Except.Extra (firstExceptT, handleIOExceptT
                      newExceptT)
 
 import           Cardano.Api
+import           Cardano.Api.DeserialiseAnyOf (InputDecodeError)
 import           Cardano.Api.Shelley
 
-import           Cardano.CLI.Shelley.Key (InputDecodeError, VerificationKeyOrFile,
+import           Cardano.CLI.Shelley.Key (OutputDirection (..), VerificationKeyOrFile,
                      VerificationKeyTextOrFile, VerificationKeyTextOrFileError (..),
                      readVerificationKeyOrFile, readVerificationKeyTextOrFileAnyOf,
-                     renderVerificationKeyTextOrFileError)
+                     renderVerificationKeyTextOrFileError, writeOutputBech32)
 import           Cardano.CLI.Shelley.Parsers (AddressCmd (..), AddressKeyType (..), OutputFile (..))
 import           Cardano.CLI.Shelley.Run.Address.Info (ShelleyAddressInfoError, runAddressInfo)
 import           Cardano.CLI.Types
@@ -79,14 +81,14 @@ runAddressKeyGen kt (VerificationKeyFile vkeyPath) (SigningKeyFile skeyPath) =
       let vkey = getVerificationKey skey
       firstExceptT ShelleyAddressCmdWriteFileError
         . newExceptT
-        $ writeFileTextEnvelope skeyPath (Just skeyDesc) skey
+        $ writeOutputBech32
+            (OutputDirectionFile skeyPath)
+            skey
       firstExceptT ShelleyAddressCmdWriteFileError
         . newExceptT
-        $ writeFileTextEnvelope vkeyPath (Just vkeyDesc) vkey
-
-    skeyDesc, vkeyDesc :: TextEnvelopeDescr
-    skeyDesc = "Payment Signing Key"
-    vkeyDesc = "Payment Verification Key"
+        $ writeOutputBech32
+            (OutputDirectionFile vkeyPath)
+            vkey
 
 
 runAddressKeyHash :: VerificationKeyTextOrFile
@@ -234,4 +236,3 @@ runAddressBuildScript (ScriptFile fp) nId mOutFp = do
   liftIO $ case mOutFp of
     Just (OutputFile oFp) -> Text.writeFile oFp scriptAddrText
     Nothing               -> Text.putStr        scriptAddrText
-
