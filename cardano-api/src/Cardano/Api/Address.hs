@@ -81,8 +81,8 @@ import qualified Shelley.Spec.Ledger.BaseTypes as Shelley
 import qualified Shelley.Spec.Ledger.Credential as Shelley
 
 import           Cardano.Api.Eras
-import           Cardano.Api.Hash
 import           Cardano.Api.HasTypeProxy
+import           Cardano.Api.Hash
 import           Cardano.Api.Key
 import           Cardano.Api.KeysByron
 import           Cardano.Api.KeysShelley
@@ -528,14 +528,16 @@ toShelleyStakeReference  NoStakeAddress =
     Shelley.StakeRefNull
 
 
-fromShelleyAddr :: IsShelleyBasedEra era
-                => Shelley.Addr StandardCrypto -> AddressInEra era
-fromShelleyAddr (Shelley.AddrBootstrap (Shelley.BootstrapAddress addr)) =
+fromShelleyAddr
+  :: ShelleyBasedEra era
+  -> Shelley.Addr StandardCrypto
+  -> AddressInEra era
+fromShelleyAddr _ (Shelley.AddrBootstrap (Shelley.BootstrapAddress addr)) =
     AddressInEra ByronAddressInAnyEra (ByronAddress addr)
 
-fromShelleyAddr (Shelley.Addr nw pc scr) =
+fromShelleyAddr sBasedEra (Shelley.Addr nw pc scr) =
     AddressInEra
-      (ShelleyAddressInEra shelleyBasedEra)
+      (ShelleyAddressInEra sBasedEra)
       (ShelleyAddress nw pc scr)
 
 fromShelleyStakeAddr :: Shelley.RewardAcnt StandardCrypto -> StakeAddress

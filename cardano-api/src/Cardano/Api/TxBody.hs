@@ -341,15 +341,15 @@ fromTxOut
 fromTxOut shelleyBasedEra' ledgerTxOut =
   case shelleyBasedEra' of
     ShelleyBasedEraShelley -> let (Shelley.TxOut addr value) = ledgerTxOut
-                              in TxOut (fromShelleyAddr addr)
+                              in TxOut (fromShelleyAddr ShelleyBasedEraShelley addr)
                                        (TxOutAdaOnly AdaOnlyInShelleyEra
                                                       (fromShelleyLovelace value))
     ShelleyBasedEraAllegra -> let (Shelley.TxOut addr value) = ledgerTxOut
-                              in TxOut (fromShelleyAddr addr)
+                              in TxOut (fromShelleyAddr ShelleyBasedEraAllegra addr)
                                         (TxOutAdaOnly AdaOnlyInAllegraEra
                                                       (fromShelleyLovelace value))
     ShelleyBasedEraMary    -> let (Shelley.TxOut addr value) = ledgerTxOut
-                              in TxOut (fromShelleyAddr addr)
+                              in TxOut (fromShelleyAddr ShelleyBasedEraMary addr)
                                         (TxOutValue MultiAssetInMaryEra
                                                       (fromMaryValue value))
 
