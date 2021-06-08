@@ -28,5 +28,26 @@ cd cardano-node
 nix-build -A scripts.mainnet.node -o mainnet-node-local
 ./mainnet-node-local
 ```
+Building the node itself will take considerable disk space, perhaps more than even the current size of the blockchain, but this is temporary and can be cleaned up afterwards. To optimize space requirements and speed up the build process you can compile the node with Nix and edit the `nix.conf` file as follows:
+```
+substituters = https://hydra.iohk.io https://cache.nixos.org/ 
+
+trusted-substituters = 
+
+trusted-public-keys = hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= 
+
+max-jobs = 2 # run at most two builds at once 
+
+cores = 0 # the builder will use all available CPU cores 
+
+nix
+
+```
+
+Once the node is compiled, you should run the clean up command:
+`nix-collect-garbage`
+
+In addition, there is a sample nix config that you can use which reuses cached binaries from IOHK and results in faster builds. This involves trusting IOHK as a source for binary packages. 
+
 
 [nix]: https://nixos.org/nix/
