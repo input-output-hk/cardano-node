@@ -62,6 +62,6 @@ git_repo_commit_description() {
         git -C "$repo" describe --match '[0-9].*' --tags $commit 2>/dev/null |
             cut -d'-' -f1,2 | tr -d '\n'
         git -C "$repo" diff --exit-code --quiet || echo '-modified'
-    } || true
+    } || echo "unknown"
 }
 
