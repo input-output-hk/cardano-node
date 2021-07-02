@@ -17,15 +17,15 @@ mkdir -p $work
 # Step 1 - Send ADA to token script owner
 
 export CARDANO_NODE_SOCKET_PATH="${CARDANO_NODE_SOCKET_PATH:-example/node-bft1/node.sock}"
-plutusscriptinuse=plutus-example/example-scripts/minting.plutus
+plutusscriptinuse=plutus-example/example-scripts/anyone-can-mint.plutus
 
 utxovkey=example/shelley/utxo-keys/utxo1.vkey
 utxoskey=example/shelley/utxo-keys/utxo1.skey
 utxoaddr=$(cardano-cli address build --testnet-magic 42 --payment-verification-key-file $utxovkey)
-cardano-cli query utxo --address $utxoaddr --cardano-mode --testnet-magic 42 --out-file utxo.json
-txin=$(jq -r 'keys[]' utxo.json)
+cardano-cli query utxo --address $utxoaddr --cardano-mode --testnet-magic 42 --out-file "$work/utxo.json"
+txin=$(jq -r 'keys[]' "$work/utxo.json")
 
-lovelaceattxin=$(jq -r ".[\"$txin\"].value.lovelace" utxo.json)
+lovelaceattxin=$(jq -r ".[\"$txin\"].value.lovelace" $work/utxo.json)
 lovelaceattxindiv2=$(expr $lovelaceattxin / 2)
 
 cardano-cli address key-gen \
