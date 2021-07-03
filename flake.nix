@@ -6,7 +6,7 @@
     nixpkgs.follows = "haskellNix/nixpkgs-2105";
     utils.url = "github:numtide/flake-utils";
     iohkNix = {
-      url = "github:input-output-hk/iohk-nix";
+      url = "github:input-output-hk/iohk-nix/libsodium-bump";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     customConfig = {
