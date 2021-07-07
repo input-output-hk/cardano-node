@@ -2,6 +2,7 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -96,30 +97,29 @@ module Cardano.Api.Script (
 
 import           Prelude
 
-import           Data.Word (Word64)
+import           Control.Applicative
+import           Control.Monad
+import           Data.Aeson (Value (..), object, (.:), (.=))
+import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Encoding as Aeson
+import qualified Data.Aeson.Types as Aeson
 import qualified Data.ByteString.Lazy as LBS
 import           Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short as SBS
 import           Data.Foldable (toList)
+import           Data.Function (on)
 import           Data.Scientific (toBoundedInteger)
+import qualified Data.Sequence.Strict as Seq
 import           Data.String (IsString)
 import           Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import           Data.Type.Equality (TestEquality (..), (:~:) (Refl))
 import           Data.Typeable (Typeable)
-import           Numeric.Natural (Natural)
-
-import           Data.Aeson (Value (..), object, (.:), (.=))
-import qualified Data.Aeson as Aeson
-import qualified Data.Aeson.Types as Aeson
-import qualified Data.Aeson.Encoding as Aeson
-import qualified Data.Sequence.Strict as Seq
 import           Data.Vector (Vector)
 import qualified Data.Vector as Vector
-
-import           Control.Applicative
-import           Control.Monad
+import           Data.Word (Word64)
+import           Numeric.Natural (Natural)
 
 import qualified Cardano.Binary as CBOR
 
@@ -128,11 +128,11 @@ import qualified Cardano.Crypto.Hash.Class as Crypto
 import           Cardano.Slotting.Slot (SlotNo)
 
 import qualified Cardano.Ledger.Core as Ledger
-import qualified Cardano.Ledger.Era  as Ledger
+import qualified Cardano.Ledger.Era as Ledger
 
+import qualified Cardano.Ledger.Keys as Shelley
 import qualified Cardano.Ledger.ShelleyMA.Timelocks as Timelock
 import           Ouroboros.Consensus.Shelley.Eras (StandardCrypto)
-import qualified Cardano.Ledger.Keys as Shelley
 import qualified Shelley.Spec.Ledger.Scripts as Shelley
 
 import qualified Cardano.Ledger.Alonzo.Language as Alonzo
@@ -390,6 +390,11 @@ data Script lang where
 deriving instance (Eq   (Script lang))
 deriving instance (Show (Script lang))
 
+instance Ord (Script lang) where
+  -- versions must be the same
+  compare (SimpleScript _ sA) (SimpleScript _ sB) = compare sA sB
+  compare (PlutusScript _ sA) (PlutusScript _ sB) = compare sA sB
+
 instance HasTypeProxy lang => HasTypeProxy (Script lang) where
     data AsType (Script lang) = AsScript (AsType lang)
     proxyToAsType _ = AsScript (proxyToAsType (Proxy :: Proxy lang))
@@ -494,6 +499,15 @@ instance Eq (ScriptInEra era) where
         Nothing   -> False
         Just Refl -> script == script'
 
+instance Ord (ScriptInEra era) where
+  compare (ScriptInEra langA scriptA) (ScriptInEra langB scriptB) =
+    case testEquality langA' langB' of
+      Nothing   -> compare (AnyScriptLanguage langA') (AnyScriptLanguage langB')
+      Just Refl -> compare scriptA scriptB
+    where
+      langA' = languageOfScriptLanguageInEra langA
+      langB' = languageOfScriptLanguageInEra langB
+
 
 data ScriptLanguageInEra lang era where
 
@@ -509,6 +523,7 @@ data ScriptLanguageInEra lang era where
      PlutusScriptV1InAlonzo  :: ScriptLanguageInEra PlutusScriptV1 AlonzoEra
 
 deriving instance Eq   (ScriptLanguageInEra lang era)
+deriving instance Ord  (ScriptLanguageInEra lang era)
 deriving instance Show (ScriptLanguageInEra lang era)
 
 instance HasTypeProxy era => HasTypeProxy (ScriptInEra era) where
@@ -878,6 +893,24 @@ data SimpleScript lang where
 
 deriving instance Eq   (SimpleScript lang)
 deriving instance Show (SimpleScript lang)
+
+instance Ord (SimpleScript lang) where
+  compare (RequireAllOf a)        (RequireAllOf b)        = compare a b
+  compare (RequireAnyOf a)        (RequireAnyOf b)        = compare a b
+  compare (RequireMOf ma a)       (RequireMOf mb b)       = compare ma mb <> compare a b
+  compare (RequireSignature a)    (RequireSignature b)    = compare a b
+  compare (RequireTimeAfter _ a)  (RequireTimeAfter _ b)  = compare a b
+  compare (RequireTimeBefore _ a) (RequireTimeBefore _ b) = compare a b
+  compare a b = (compare `on` order) a b
+    where
+      order = \case
+        -- sorted alphabetically
+        RequireAllOf     {} -> 0 :: Int
+        RequireAnyOf     {} -> 1
+        RequireMOf       {} -> 2
+        RequireSignature {} -> 3
+        RequireTimeAfter {} -> 4
+        RequireTimeBefore{} -> 5
 
 instance HasTypeProxy lang => HasTypeProxy (SimpleScript lang) where
     data AsType (SimpleScript lang) = AsSimpleScript (AsType lang)

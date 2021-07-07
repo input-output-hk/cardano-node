@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -16,6 +17,7 @@ module Cardano.Api.Eras
   , CardanoEra(..)
   , IsCardanoEra(..)
   , AnyCardanoEra(..)
+  , allCardanoEras
   , anyCardanoEra
   , InAnyCardanoEra(..)
 
@@ -143,6 +145,19 @@ data CardanoEra era where
      AllegraEra :: CardanoEra AllegraEra
      MaryEra    :: CardanoEra MaryEra
      AlonzoEra  :: CardanoEra AlonzoEra
+
+-- | Collection of all possible eras.
+-- Useful for testing code against all eras uniformly.
+-- Isomorphic to a list @[forall era. CardanoEra era]@
+-- if that was possible in Haskell.
+allCardanoEras :: [AnyCardanoEra]
+allCardanoEras =
+  [ AnyCardanoEra ByronEra
+  , AnyCardanoEra ShelleyEra
+  , AnyCardanoEra AllegraEra
+  , AnyCardanoEra MaryEra
+  , AnyCardanoEra AlonzoEra
+  ]
 
 deriving instance Eq   (CardanoEra era)
 deriving instance Ord  (CardanoEra era)
@@ -332,4 +347,3 @@ type family ShelleyLedgerEra era where
   ShelleyLedgerEra AllegraEra = Ledger.StandardAllegra
   ShelleyLedgerEra MaryEra    = Ledger.StandardMary
   ShelleyLedgerEra AlonzoEra  = Ledger.StandardAlonzo
-

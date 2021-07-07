@@ -201,7 +201,9 @@ test-suite cardano-api-test
                       , shelley-spec-ledger
                       , shelley-spec-ledger-test
                       , tasty
+                      , tasty-hedgehog
                       , tasty-quickcheck
+                      , tasty-th
                       , time
 
   other-modules:        Test.Cardano.Api.Crypto
@@ -210,6 +212,7 @@ test-suite cardano-api-test
                         Test.Cardano.Api.KeysByron
                         Test.Cardano.Api.Ledger
                         Test.Cardano.Api.Metadata
+                        Test.Cardano.Api.TxBody
                         Test.Cardano.Api.Typed.Bech32
                         Test.Cardano.Api.Typed.CBOR
                         Test.Cardano.Api.Typed.Envelope

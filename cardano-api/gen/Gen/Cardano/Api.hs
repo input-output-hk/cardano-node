@@ -22,10 +22,10 @@ import qualified Hedgehog.Range as Range
 
 genMetadata :: MonadGen m => m (Metadata era)
 genMetadata = do
-  numberOfIndicies <- Gen.integral (Range.linear 1 15)
-  let indexes = map (\i -> fromIntegral i :: Word64) [1..numberOfIndicies]
-  mDatums <- Gen.list (Range.singleton numberOfIndicies) genMetadatum
-  return . Metadata . Map.fromList $ zip indexes mDatums
+  numberOfIndices <- Gen.integral (Range.linear 1 15)
+  let indices = map (\i -> fromIntegral i :: Word64) [1..numberOfIndices]
+  mData <- Gen.list (Range.singleton numberOfIndices) genMetadatum
+  return . Metadata . Map.fromList $ zip indices mData
 
 genMetadatum :: MonadGen m => m Metadatum
 genMetadatum = do

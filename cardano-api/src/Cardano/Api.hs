@@ -20,6 +20,7 @@ module Cardano.Api (
     CardanoEra(..),
     IsCardanoEra(..),
     AnyCardanoEra(..),
+    allCardanoEras,
     anyCardanoEra,
     InAnyCardanoEra(..),
 
