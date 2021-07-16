@@ -68,6 +68,9 @@ executable plutus-example
                       , directory
                       , filepath
                       , plutus-example
+                      , plutus-ledger-api
+                      , plutus-core
+                      , cardano-ledger-alonzo
 
 
 
